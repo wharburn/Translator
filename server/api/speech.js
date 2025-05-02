@@ -116,7 +116,7 @@ router.post('/speech-to-text', upload.single('audio'), async (req, res) => {
 
     try {
       // Check if we should use mock responses
-      if (process.env.USE_MOCK_SPEECH === 'true') {
+      if (credConfig.useMockSpeechToText) {
         // Use mock responses for speech-to-text
         console.log('Using mock speech-to-text response (configured via env)');
 
