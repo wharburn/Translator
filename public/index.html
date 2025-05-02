@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Live Translator</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="translator-container">
+            <!-- Header with Logo and Start Button -->
+            <div class="header">
+                <div class="logo-container">
+                    <img src="/static/images/SWlogo.png" alt="ScreenWhisper Logo" class="logo">
+                </div>
+                <button id="listenButton" type="button" class="btn">
+                    Start Listening
+                </button>
+            </div>
+
+            <!-- Language Selection -->
+            <div class="language-section">
+                <div class="language-container">
+                    <div class="language-group">
+                        <label for="sourceLanguage" class="language-label">Source Language</label>
+                        <select id="sourceLanguage" name="sourceLanguage" aria-label="Source Language" class="language-select">
+                            <option value="en-US">English (US)</option>
+                            <option value="ru-RU">Russian</option>
+                            <option value="es-ES">Spanish</option>
+                            <option value="fr-FR">French</option>
+                            <option value="de-DE">German</option>
+                            <option value="it-IT">Italian</option>
+                            <option value="ja-JP">Japanese</option>
+                            <option value="ko-KR">Korean</option>
+                            <option value="zh-CN">Chinese (Simplified)</option>
+                        </select>
+                    </div>
+                    <div class="language-group">
+                        <label for="targetLanguage" class="language-label">Target Language</label>
+                        <select id="targetLanguage" aria-label="Target Language" class="language-select">
+                            <option value="EN">English</option>
+                            <option value="RU">Russian</option>
+                            <option value="FR">French</option>
+                            <option value="ES">Spanish</option>
+                            <option value="DE">German</option>
+                            <option value="IT">Italian</option>
+                            <option value="JA">Japanese</option>
+                            <option value="KO">Korean</option>
+                            <option value="ZH">Chinese</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status and Error Messages -->
+            <div id="statusMessage" class="status-message"></div>
+
+            <!-- Progress Indicators -->
+            <div id="progressContainer" class="progress-container">
+                <div class="progress-track">
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
+                <p id="progressText" class="progress-text">Processing...</p>
+            </div>
+
+            <!-- Translation Display -->
+            <div class="translation-section">
+                <div class="translation-card">
+                    <h3 class="card-title">Transcribed Text</h3>
+                    <div id="transcribedText" class="transcribed-text">Record audio to transcribe...</div>
+                </div>
+
+                <div class="translation-card">
+                    <h3 class="card-title">Translated Text</h3>
+                    <div id="translatedText" class="translated-text"></div>
+                </div>
+
+                <div class="translation-card">
+                    <h3 class="card-title">Translation History</h3>
+                    <div id="translationHistory" class="history-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
