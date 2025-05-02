@@ -24,9 +24,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioChunks = [];
     let chunkInterval;
     let isMobile = false;
+    let silenceTimer = null;
+    let isSpeaking = false;
+    let audioContext = null;
+    let analyser = null;
+    let microphone = null;
+    let scriptProcessor = null;
+    let speechStartTime = null;
+    let volumeHistory = [];
+    let lastProcessedTime = 0;
 
     // Constants
     const CHUNK_INTERVAL = 2000; // Process audio chunks every 2 seconds
+    const SILENCE_THRESHOLD = 15; // Volume level below which is considered silence (0-100)
+    const SPEECH_THRESHOLD = 25; // Volume level above which is considered speech (0-100)
+    const MIN_SPEECH_DURATION = 500; // Minimum duration of speech to be considered valid (ms)
+    const SILENCE_DURATION = 1500; // Duration of silence to be considered end of sentence (ms)
+    const VOLUME_HISTORY_SIZE = 10; // Number of volume samples to keep for smoothing
 
     // Check if running on mobile device
     function checkMobile() {
@@ -179,10 +193,13 @@ document.addEventListener('DOMContentLoaded', () => {
             updateProgress(60, 'Audio transcribed!');
             const data = await response.json();
 
+            console.log('Received response from server:', data);
+
             // If we got a transcription, return it
-            if (data.transcription) {
+            if (data && data.transcription) {
                 return data.transcription;
             } else {
+                console.error('No transcription in response:', data);
                 throw new Error('No transcription returned from server');
             }
         } catch (error) {
@@ -289,8 +306,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (translation !== lastTranslatedText) {
                         addToHistory(transcription, translation);
                         lastTranslatedText = translation;
+
+                        // Update last processed time for sentence boundary detection
+                        lastProcessedTime = Date.now();
                     }
                 }
+            }
+
+            // If we're still speaking, prepare for the next chunk
+            if (isSpeaking) {
+                showStatus('Listening for more...', 'info');
             }
         } catch (error) {
             console.error('Error processing audio chunk:', error);
@@ -301,10 +326,102 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Get current volume level from audio data
+    function getVolumeLevel(analyser) {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+
+        // Calculate average volume
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+        }
+
+        // Return volume level from 0-100
+        return Math.min(100, Math.round((sum / bufferLength) * 100 / 256));
+    }
+
+    // Get smoothed volume level using history
+    function getSmoothedVolumeLevel(currentVolume) {
+        // Add current volume to history
+        volumeHistory.push(currentVolume);
+
+        // Keep history at fixed size
+        if (volumeHistory.length > VOLUME_HISTORY_SIZE) {
+            volumeHistory.shift();
+        }
+
+        // Calculate average
+        const sum = volumeHistory.reduce((a, b) => a + b, 0);
+        return sum / volumeHistory.length;
+    }
+
+    // Handle audio processing for voice activity detection
+    function processAudio() {
+        if (!analyser) return;
+
+        // Get current volume level
+        const rawVolume = getVolumeLevel(analyser);
+        const volume = getSmoothedVolumeLevel(rawVolume);
+
+        // Detect speech start
+        if (!isSpeaking && volume > SPEECH_THRESHOLD) {
+            isSpeaking = true;
+            speechStartTime = Date.now();
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+
+            // Visual feedback that we detected speech
+            listenButton.classList.add('active-speech');
+            showStatus('Speech detected', 'info');
+        }
+
+        // Detect speech end (silence)
+        if (isSpeaking && volume < SILENCE_THRESHOLD) {
+            // Only consider it silence if we've been speaking for the minimum duration
+            const speechDuration = Date.now() - speechStartTime;
+
+            if (speechDuration > MIN_SPEECH_DURATION) {
+                if (!silenceTimer) {
+                    silenceTimer = setTimeout(() => {
+                        // End of sentence detected
+                        isSpeaking = false;
+                        listenButton.classList.remove('active-speech');
+
+                        // Process the audio if we haven't processed recently
+                        const now = Date.now();
+                        if (now - lastProcessedTime > 1000 && audioChunks.length > 0) {
+                            lastProcessedTime = now;
+                            processAudioChunks();
+                            showStatus('Processing speech...', 'info');
+                        }
+
+                        silenceTimer = null;
+                    }, SILENCE_DURATION);
+                }
+            }
+        } else if (silenceTimer && volume > SILENCE_THRESHOLD) {
+            // Cancel silence timer if volume goes back up
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+        }
+    }
+
     // Start listening
     async function startListening() {
         try {
             showStatus('Initializing microphone...', 'info');
+
+            // Reset state
+            volumeHistory = [];
+            isSpeaking = false;
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
 
             // Basic audio constraints that work on most devices
             let constraints = { audio: true };
@@ -329,6 +446,29 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // Use simpler constraints for mobile
                 audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+            }
+
+            // Set up audio context for voice activity detection
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+
+                microphone = audioContext.createMediaStreamSource(audioStream);
+                microphone.connect(analyser);
+
+                // Create script processor for continuous monitoring
+                scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+                scriptProcessor.onaudioprocess = () => processAudio();
+
+                // Connect the script processor
+                analyser.connect(scriptProcessor);
+                scriptProcessor.connect(audioContext.destination);
+
+                console.log('Voice activity detection initialized');
+            } catch (err) {
+                console.warn('Could not initialize voice activity detection:', err);
+                // Continue without voice activity detection
             }
 
             showStatus('Listening...', 'info');
@@ -427,6 +567,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 chunkInterval = null;
             }
 
+            // Clean up voice activity detection resources
+            if (scriptProcessor) {
+                scriptProcessor.disconnect();
+                scriptProcessor = null;
+            }
+
+            if (analyser) {
+                analyser.disconnect();
+                analyser = null;
+            }
+
+            if (microphone) {
+                microphone.disconnect();
+                microphone = null;
+            }
+
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close().catch(err => console.warn('Error closing audio context:', err));
+                audioContext = null;
+            }
+
+            // Clear any pending silence timer
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+
+            // Reset speech detection state
+            isSpeaking = false;
+            volumeHistory = [];
+
             // Process any remaining audio
             if (audioChunks.length > 0) {
                 setTimeout(processAudioChunks, 500);
@@ -436,6 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isListening = false;
             listenButton.textContent = 'Start Listening';
             listenButton.classList.remove('recording');
+            listenButton.classList.remove('active-speech');
 
             showStatus('Stopped listening', 'info');
         } catch (error) {

@@ -22,6 +22,12 @@ const port = process.env.PORT || 5000;
 // Initialize credentials
 const credentialStatus = initCredentials();
 
+// Check if credentials are valid
+if (!credentialStatus.isValid) {
+  console.warn('Warning: Credentials validation failed. Speech-to-text functionality may not work properly.');
+  console.warn('Please make sure you have set up the Google Cloud credentials correctly.');
+}
+
 // Set credential status in app locals for use in routes
 app.locals.credentials = credentialStatus;
 

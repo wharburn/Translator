@@ -72,6 +72,18 @@ body {
     }
 }
 
+/* Active speech indicator */
+.active-speech {
+    background-color: #22c55e !important; /* green-600 */
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.6);
+    animation: none;
+    transition: all 0.3s ease;
+}
+
+.active-speech:hover {
+    background-color: #16a34a !important; /* green-700 */
+}
+
 /* Language selection */
 .language-section {
     margin-bottom: 1.5rem;
