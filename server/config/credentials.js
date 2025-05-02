@@ -46,11 +46,21 @@ function validateEnv() {
 function initCredentials() {
   const isValid = validateEnv();
 
+  // Determine if we should use mock speech-to-text
+  const useMockSpeech = process.env.USE_MOCK_SPEECH === 'true' ||
+                        !process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  if (useMockSpeech) {
+    console.log('Speech-to-text will use mock responses (configured via env or missing credentials)');
+  } else {
+    console.log('Speech-to-text will use Google Cloud API');
+  }
+
   return {
     isValid: true, // Always return true to allow the app to start
     googleCredentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
     hasDeeplKey: !!process.env.DEEPL_API_KEY,
-    useMockSpeechToText: !process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.NODE_ENV === 'production',
+    useMockSpeechToText: useMockSpeech,
     useMockTranslation: !process.env.DEEPL_API_KEY
   };
 }

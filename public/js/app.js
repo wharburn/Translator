@@ -149,10 +149,23 @@ document.addEventListener('DOMContentLoaded', () => {
             showProgress('Transcribing audio...');
             updateProgress(30, 'Transcribing audio...');
 
+            // Log audio blob details for debugging
+            console.log('Audio blob:', {
+                type: audioBlob.type,
+                size: audioBlob.size,
+                lastModified: audioBlob.lastModified
+            });
+
+            // Create a form with the audio blob
             const formData = new FormData();
             formData.append('audio', audioBlob);
             formData.append('language', sourceLanguage.value);
 
+            // Add browser info to help with debugging
+            formData.append('userAgent', navigator.userAgent);
+            formData.append('mimeType', audioBlob.type);
+
+            // Send to server
             const response = await fetch('/api/speech-to-text', {
                 method: 'POST',
                 body: formData
@@ -165,10 +178,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateProgress(60, 'Audio transcribed!');
             const data = await response.json();
-            return data.transcription;
+
+            // If we got a transcription, return it
+            if (data.transcription) {
+                return data.transcription;
+            } else {
+                throw new Error('No transcription returned from server');
+            }
         } catch (error) {
             console.error('Speech to text error:', error);
-            showStatus(`Error: ${error.message}`, 'error');
+
+            // Show a more user-friendly error message
+            if (error.message.includes('format') || error.message.includes('unsupported')) {
+                showStatus('Audio format not supported. Please try a different browser.', 'error');
+            } else if (error.message.includes('No speech detected')) {
+                showStatus('No speech detected. Please speak more clearly.', 'warning');
+            } else {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+
             hideProgress();
             return '';
         }
