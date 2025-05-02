@@ -20,37 +20,72 @@ A real-time speech-to-text and translation application that works on both deskto
 ### Prerequisites
 
 - Node.js (v14 or higher)
-- Google Cloud account with Speech-to-Text API enabled
-- DeepL API key
+- (Optional) Google Cloud account with Speech-to-Text API enabled
+- (Optional) DeepL API key
 
 ### Installation
 
 1. Clone the repository:
-   ```
+
+   ```bash
    git clone <repository-url>
    cd Translator
    ```
 
 2. Install dependencies:
-   ```
+
+   ```bash
    npm install
    ```
 
-3. Create a `.env` file in the root directory with the following variables:
-   ```
+3. Create a `.env` file in the root directory (see `.env.example` for reference):
+
+   ```env
    DEEPL_API_KEY=your_deepl_api_key
    GOOGLE_APPLICATION_CREDENTIALS=path_to_google_credentials_json
+   GOOGLE_PROJECT_ID=your_google_project_id
    PORT=5000
+   NODE_ENV=development
    ```
 
-4. Place your Google Cloud credentials JSON file in the root directory.
+   > **Note**: If you don't have API keys, the application will use mock responses for both speech-to-text and translation.
 
-5. Start the server:
-   ```
+4. Start the server:
+
+   ```bash
    npm start
    ```
 
-6. Open your browser and navigate to `http://localhost:5000`
+5. Open your browser and navigate to `http://localhost:5000`
+
+## Development
+
+Run the application in development mode with hot reloading:
+
+```bash
+npm run dev
+```
+
+## Project Structure
+
+```text
+/
+├── public/              # Frontend static assets
+│   ├── css/             # CSS stylesheets
+│   ├── js/              # JavaScript files
+│   └── index.html       # Main HTML file
+├── server/              # Backend code
+│   ├── api/             # API routes
+│   │   ├── speech.js    # Speech-to-text endpoint
+│   │   └── translate.js # Translation endpoint
+│   ├── config/          # Configuration files
+│   └── server.js        # Main server file
+├── static/              # Static assets (images, etc.)
+├── uploads/             # Temporary audio uploads (gitignored)
+├── .env                 # Environment variables (gitignored)
+├── .env.example         # Example environment variables
+└── package.json         # Node.js dependencies
+```
 
 ## Deployment
 
@@ -59,12 +94,20 @@ This application is configured for deployment on Render. Follow these steps:
 1. Push your code to a GitHub repository
 2. Create a new Web Service on Render
 3. Connect to your GitHub repository
-4. Configure the environment variables
-5. Deploy!
+4. Configure the environment variables:
+   - `DEEPL_API_KEY`: Your DeepL API key
+   - `NODE_ENV`: Set to `production`
+5. (Optional) Add Google credentials as a secret file:
+   - Path: `/etc/secrets/google-credentials.json`
+   - Contents: Your Google credentials JSON
+6. Deploy!
+
+> **Note**: If you don't provide API keys, the application will use mock responses.
 
 ## Mobile Compatibility
 
 The application is designed to work on mobile browsers with the following considerations:
+
 - Uses responsive design for all screen sizes
 - Optimizes audio capture for mobile devices
 - Handles mobile-specific browser limitations

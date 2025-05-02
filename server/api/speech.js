@@ -8,20 +8,30 @@ const speech = require('@google-cloud/speech');
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
-// Initialize Google Speech Client if credentials are available
+// Initialize Google Speech Client
 let speechClient;
 try {
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
+  // Read client_secret.json file
+  const fs = require('fs');
+  const path = require('path');
+  const clientSecretPath = path.join(__dirname, '..', '..', 'client_secret.json');
+
+  if (fs.existsSync(clientSecretPath)) {
+    const clientSecret = JSON.parse(fs.readFileSync(clientSecretPath, 'utf8'));
+
+    // Initialize with project ID from client_secret.json
     speechClient = new speech.SpeechClient({
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+      projectId: clientSecret.web.project_id,
+      credentials: {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL || 'speech-to-text@translator-458601.iam.gserviceaccount.com',
+        private_key: process.env.GOOGLE_PRIVATE_KEY || '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\nMzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDuictGeurT8jNbvJZHtCSuYEvu\nNMoSfm76oqFvAp8Gy0iz5sxjZmSnXyCdPEovGhLa0VzMaQ8s+CLOyS56YyCFGeJZ\n-----END PRIVATE KEY-----\n',
+      }
     });
-    console.log('Google Speech-to-Text client initialized with credentials file');
+    console.log('Google Speech-to-Text client initialized with project ID:', clientSecret.web.project_id);
   } else {
-    // For development/testing or when credentials are not available
-    speechClient = new speech.SpeechClient({
-      projectId: process.env.GOOGLE_PROJECT_ID || 'mock-project-id',
-    });
-    console.log('Google Speech-to-Text client initialized with mock credentials');
+    // Fallback to environment variables
+    speechClient = new speech.SpeechClient();
+    console.log('Google Speech-to-Text client initialized with default credentials');
   }
 } catch (error) {
   console.warn('Error initializing Google Speech-to-Text client:', error.message);
@@ -72,27 +82,32 @@ router.post('/speech-to-text', upload.single('audio'), async (req, res) => {
 
     let transcription;
 
-    // In production or when credentials are not available, use mock response
-    if (process.env.NODE_ENV === 'production' || !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('Using mock speech-to-text response');
-      transcription = "This is a mock transcription for testing purposes. Your audio was received successfully.";
-    } else {
-      try {
-        // Try to use the actual Google Speech-to-Text API
-        const [response] = await speechClient.recognize(request);
+    try {
+      // Use the Google Speech-to-Text API
+      console.log('Sending audio to Google Speech-to-Text API...');
+      const [response] = await speechClient.recognize(request);
 
-        if (response && response.results && response.results.length > 0) {
-          transcription = response.results
-            .map(result => result.alternatives[0].transcript)
-            .join('\n');
-        } else {
-          console.log('No transcription results returned, using mock response');
-          transcription = "No speech detected. Please try again.";
-        }
-      } catch (error) {
-        console.error('Error using Google Speech-to-Text API:', error);
-        console.log('Falling back to mock response');
-        transcription = "Error processing speech. This is a mock response.";
+      if (response && response.results && response.results.length > 0) {
+        transcription = response.results
+          .map(result => result.alternatives[0].transcript)
+          .join('\n');
+        console.log('Transcription received:', transcription);
+      } else {
+        console.log('No transcription results returned');
+        transcription = "No speech detected. Please try again.";
+      }
+    } catch (error) {
+      console.error('Error using Google Speech-to-Text API:', error);
+
+      // Provide a more helpful error message
+      if (error.message.includes('permission')) {
+        transcription = "Error: API permission denied. Please check your Google Cloud credentials.";
+      } else if (error.message.includes('auth')) {
+        transcription = "Error: Authentication failed. Please check your Google Cloud credentials.";
+      } else if (error.message.includes('quota')) {
+        transcription = "Error: API quota exceeded. Please try again later.";
+      } else {
+        transcription = "Error processing speech. Please try again.";
       }
     }
 
