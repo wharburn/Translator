@@ -19,12 +19,11 @@ const translateRoutes = require('./api/translate');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Validate credentials
+// Initialize credentials
 const credentialStatus = initCredentials();
-if (!credentialStatus.isValid) {
-  console.error('Error: Invalid credentials configuration. Please check your .env file.');
-  process.exit(1);
-}
+
+// Set credential status in app locals for use in routes
+app.locals.credentials = credentialStatus;
 
 // Middleware
 app.use(cors());

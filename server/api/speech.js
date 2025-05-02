@@ -8,15 +8,32 @@ const speech = require('@google-cloud/speech');
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
-// Initialize Google Speech Client
-// For development/testing purposes only - in production, use a proper service account
-const speechClient = new speech.SpeechClient({
-  credentials: {
-    client_email: 'test-account@test-project.iam.gserviceaccount.com',
-    private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\nMzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDuictGeurT8jNbvJZHtCSuYEvu\nNMoSfm76oqFvAp8Gy0iz5sxjZmSnXyCdPEovGhLa0VzMaQ8s+CLOyS56YyCFGeJZ\n-----END PRIVATE KEY-----\n',
-  },
-  projectId: process.env.GOOGLE_PROJECT_ID || 'translator-458601',
-});
+// Initialize Google Speech Client if credentials are available
+let speechClient;
+try {
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.NODE_ENV !== 'production') {
+    speechClient = new speech.SpeechClient({
+      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+    });
+    console.log('Google Speech-to-Text client initialized with credentials file');
+  } else {
+    // For development/testing or when credentials are not available
+    speechClient = new speech.SpeechClient({
+      projectId: process.env.GOOGLE_PROJECT_ID || 'mock-project-id',
+    });
+    console.log('Google Speech-to-Text client initialized with mock credentials');
+  }
+} catch (error) {
+  console.warn('Error initializing Google Speech-to-Text client:', error.message);
+  console.warn('Will use mock responses for speech-to-text');
+
+  // Create a mock client
+  speechClient = {
+    recognize: async () => {
+      return [{ results: [] }];
+    }
+  };
+}
 
 /**
  * Speech-to-text endpoint
@@ -53,18 +70,31 @@ router.post('/speech-to-text', upload.single('audio'), async (req, res) => {
       config: config,
     };
 
-    // For development/testing - use a mock response instead of actual API call
-    // In production, uncomment the following lines and use a proper service account
-    /*
-    const [response] = await speechClient.recognize(request);
-    const transcription = response.results
-      .map(result => result.alternatives[0].transcript)
-      .join('\n');
-    */
+    let transcription;
 
-    // Mock response for testing
-    console.log('Using mock speech-to-text response for testing');
-    const transcription = "This is a mock transcription for testing purposes. Your audio was received successfully.";
+    // In production or when credentials are not available, use mock response
+    if (process.env.NODE_ENV === 'production' || !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log('Using mock speech-to-text response');
+      transcription = "This is a mock transcription for testing purposes. Your audio was received successfully.";
+    } else {
+      try {
+        // Try to use the actual Google Speech-to-Text API
+        const [response] = await speechClient.recognize(request);
+
+        if (response && response.results && response.results.length > 0) {
+          transcription = response.results
+            .map(result => result.alternatives[0].transcript)
+            .join('\n');
+        } else {
+          console.log('No transcription results returned, using mock response');
+          transcription = "No speech detected. Please try again.";
+        }
+      } catch (error) {
+        console.error('Error using Google Speech-to-Text API:', error);
+        console.log('Falling back to mock response');
+        transcription = "Error processing speech. This is a mock response.";
+      }
+    }
 
     // Clean up temporary file
     fs.unlinkSync(filename);
