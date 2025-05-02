@@ -87,6 +87,21 @@ npm run dev
 └── package.json         # Node.js dependencies
 ```
 
+## Setting Up Real Speech-to-Text
+
+To use real speech-to-text with Google Cloud Speech-to-Text API:
+
+1. Create a Google Cloud project at https://console.cloud.google.com/
+2. Enable the Speech-to-Text API for your project
+3. Create a service account with the "Speech-to-Text User" role
+4. Create and download a JSON key for this service account
+5. Save the key file in your project directory (e.g., as `google-credentials.json`)
+6. Update your `.env` file:
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS=google-credentials.json
+   USE_MOCK_SPEECH=false
+   ```
+
 ## Deployment
 
 This application is configured for deployment on Render. Follow these steps:
@@ -97,9 +112,11 @@ This application is configured for deployment on Render. Follow these steps:
 4. Configure the environment variables:
    - `DEEPL_API_KEY`: Your DeepL API key
    - `NODE_ENV`: Set to `production`
-5. (Optional) Add Google credentials as a secret file:
+   - `USE_MOCK_SPEECH`: Set to `false` to use real speech-to-text (default is `true`)
+5. Add Google credentials as a secret file:
    - Path: `/etc/secrets/google-credentials.json`
-   - Contents: Your Google credentials JSON
+   - Contents: Your Google credentials JSON (from step 4 of "Setting Up Real Speech-to-Text")
+   - Add environment variable: `GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/google-credentials.json`
 6. Deploy!
 
 > **Note**: If you don't provide API keys, the application will use mock responses.
